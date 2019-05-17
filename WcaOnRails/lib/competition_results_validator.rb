@@ -7,20 +7,21 @@ class CompetitionResultsValidator
 
   # General errors and warnings
   UNEXPECTED_RESULTS_ERROR = "Unexpected results for %{event_id}. The event is present in the results but not listed as an official event."\
-  "Remove the event from the results or contact the WCAT to request the event to be added to the WCA website."
+    " Remove the event from the results or contact the WCAT to request the event to be added to the WCA website."
   MISSING_RESULTS_WARNING = "Missing results for %{event_id}. The event is not present in the results but listed as an official event."\
-  "If the event was held, correct the results. If the event was not held, leave a comment about that to the WRT."
+    " If the event was held, correct the results. If the event was not held, leave a comment about that to the WRT."
   UNEXPECTED_ROUND_RESULTS_ERROR = "Unexpected results for round %{round_id}. The round is present in the results but not created on the events tab. Edit the events tab to include the round."
   MISSING_ROUND_RESULTS_ERROR = "Missing results for round %{round_id}. There is an additional round in the events tab that is not present in the results. Edit the events tab to remove the round."
   UNEXPECTED_COMBINED_ROUND_ERROR = "No cutoff was announced for '%{round_name}', but it has been detected as a combined round in the results. Please update the round's information in the competition's manage events page."
   MISSING_SCRAMBLES_FOR_ROUND_ERROR = "[%{round_id}] Missing scrambles. Use the workbook assistant to add the correct scrambles to the round."
   UNEXPECTED_SCRAMBLES_FOR_ROUND_ERROR = "[%{round_id}] Too many scrambles. Use the workbook assistant to uncheck the unused scrambles."
   MISSING_SCRAMBLES_FOR_GROUP_ERROR = "[%{round_id}] Group %{group_id}: missing scrambles, detected only %{actual} instead of %{expected}."
-  CHOOSE_MAIN_EVENT_WARNING = "Your results do not contain results for 3x3x3 Cube. Please tell WRT if the results should be anounced with 'no main event' or if there was a different main event at the competition."
+  CHOOSE_MAIN_EVENT_WARNING = "Your results do not contain results for 3x3x3 Cube. Please tell WRT in the comments that there was 'no main event' if no event was treated as the main event at the competition."\
+  " Otherwise, if an event other than 3x3x3 Cube was treated as the main event, please name the main event in your comments to WRT and explain how that event was treated as the main event of the competition."
 
   # Regulations-specific errors and warnings
   COMPETITOR_LIMIT_WARNING = "The number of persons in the competition (%{n_competitors}) is above the competitor limit (%{competitor_limit})."\
-  "Unless specific agreement was made when announcing the competition (such as a per-day competitor limit), the results of the competitors registered after the competitor limit was reached must be removed."
+    " Unless a specific agreement was made when announcing the competition (such as a per-day competitor limit), the results of the competitors registered after the competitor limit was reached must be removed."
   REGULATION_9M_ERROR = "Event %{event_id} has more than four rounds, which must not happen per Regulation 9m."
   REGULATION_9M1_ERROR = "Round %{round_id} has 99 competitors or less but has at least three subsequents rounds, which must not happen per Regulation 9m1."
   REGULATION_9M2_ERROR = "Round %{round_id} has 15 competitors or less but has at least two subsequents rounds, which must not happen per Regulation 9m2."
@@ -55,6 +56,10 @@ class CompetitionResultsValidator
   MBF_RESULT_OVER_TIME_LIMIT_WARNING = "[%{round_id}] Result '%{result}' for %{person_name} is over the time limit. Please make sure it is the consequence of +2 penalties before sending the results, or fix the result to DNF."
   DNS_AFTER_RESULT_WARNING = "[%{round_id}] %{person_name} has at least one DNS results followed by a valid result. Please make sure it is indeed a DNS and not a DNF."
   SIMILAR_RESULTS_WARNING = "[%{round_id}] Result for %{person_name} is similar to the results for %{similar_person_name}."
+
+  # Miscelaneous errors
+  MISSING_CUMULATIVE_ROUND_ID_ERROR = "[%{original_round_id}] Unable to find the round \"%{wcif_id}\" for the cumulative time limit specified in the WCIF."\
+  " Please go to the manage events page and remove %{wcif_id} from the cumulative time limit for %{original_round_id}. WST knows about this bug (GitHub issue #3254)."
 
   INDIVIDUAL_RESULT_JSON_SCHEMA = {
     "type" => "object",
@@ -589,14 +594,22 @@ class CompetitionResultsValidator
             cumulative_round_ids = cumulative_wcif_round_ids.map do |wcif_id|
               parsed_wcif_id = Round.parse_wcif_id(wcif_id)
               # Get the actual round_id from our expected rounds by id
-              @expected_rounds_by_ids.select do |id, round|
+              actual_round_id = @expected_rounds_by_ids.select do |id, round|
                 round.event.id == parsed_wcif_id[:event_id] && round.number == parsed_wcif_id[:round_number]
-              end.first[0]
-            end
+              end.first
+              unless actual_round_id
+                # FIXME: this needs to be removed when https://github.com/thewca/worldcubeassociation.org/issues/3254 is fixed.
+                @errors[:results] << format(MISSING_CUMULATIVE_ROUND_ID_ERROR, wcif_id: wcif_id, original_round_id: round_id)
+              end
+              actual_round_id&.at(0)
+            end.compact
 
             # Get all solve times for all cumulative rounds for the current person
             all_results_for_cumulative_rounds = cumulative_round_ids.map do |id|
-              results_by_round_id[id].find { |r| r.personId == result.personId }
+              # NOTE: since we proceed with all checks even if some expected rounds
+              # do not exist, we may have *expected* cumulative rounds that may
+              # not exist in results.
+              results_by_round_id[id]&.find { |r| r.personId == result.personId }
             end.compact.map(&:solve_times).flatten
             completed_solves_for_rounds = all_results_for_cumulative_rounds.select(&:complete?)
             number_of_dnf_solves = all_results_for_cumulative_rounds.select(&:dnf?).size

@@ -30,6 +30,8 @@ Rails.application.routes.draw do
   get 'admin/avatars' => 'admin/avatars#index'
   post 'admin/avatars' => 'admin/avatars#update_all'
 
+  get 'map' => 'competitions#embedable_map'
+
   get 'competitions/mine' => 'competitions#my_competitions', as: :my_comps
   get 'competitions/for_senior(/:user_id)' => 'competitions#for_senior', as: :competitions_for_senior
   resources :competitions, only: [:index, :show, :edit, :update, :new, :create] do
@@ -59,6 +61,7 @@ Rails.application.routes.draw do
     get '/admin/upload-results' => "admin#new_results", as: :admin_upload_results_edit
     get '/admin/check-existing-results' => "admin#check_results", as: :admin_check_existing_results
     post '/admin/upload-json' => "admin#create_results", as: :admin_upload_results
+    post '/admin/clear-submission' => "admin#clear_results_submission", as: :clear_results_submission
   end
 
   get 'competitions/:competition_id/report/edit' => 'delegate_reports#edit', as: :delegate_report_edit
@@ -94,12 +97,12 @@ Rails.application.routes.draw do
   get 'competitions/:id/post/announcement' => 'competitions#post_announcement', as: :competition_post_announcement
   get 'competitions/:id/post/results' => 'competitions#post_results', as: :competition_post_results
 
-  get 'delegate' => 'delegates_panel#index'
-  get 'delegate/crash-course' => 'delegates_panel#crash_course'
-  get 'delegate/crash-course/edit' => 'delegates_panel#edit_crash_course'
-  patch 'delegate/crash-course' => 'delegates_panel#update_crash_course'
-  get 'delegate/pending-claims(/:user_id)' => 'delegates_panel#pending_claims_for_subordinate_delegates', as: 'pending_claims'
-  get 'delegate/seniors' => 'delegates_panel#seniors'
+  get 'panel' => 'panel#index'
+  get 'panel/delegate-crash-course' => 'panel#delegate_crash_course'
+  get 'panel/delegate-crash-course/edit' => 'panel#edit_delegate_crash_course'
+  patch 'panel/delegate-crash-course' => 'panel#update_delegate_crash_course'
+  get 'panel/pending-claims(/:user_id)' => 'panel#pending_claims_for_subordinate_delegates', as: 'pending_claims'
+  get 'panel/seniors' => 'panel#seniors'
   resources :notifications, only: [:index]
 
   root 'posts#index'
@@ -192,6 +195,7 @@ Rails.application.routes.draw do
       get '/persons' => "persons#index"
       get '/persons/:wca_id' => "persons#show", as: :person
       get '/persons/:wca_id/results' => "persons#results", as: :person_results
+      get '/geocoding/search' => 'geocoding#get_location_from_query'
       resources :competitions, only: [:index, :show] do
         get '/wcif' => 'competitions#show_wcif'
         get '/results' => 'competitions#results'

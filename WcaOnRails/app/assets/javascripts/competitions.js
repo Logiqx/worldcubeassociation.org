@@ -71,9 +71,16 @@ onPage('competitions#index', function() {
     $('#loading').hide();
 
     // Scroll to the top of the form if we are in map mode and screen width is greater than 800px
-    if($('#competitions-map').is(':visible') && $(window).innerWidth() > 800) {
-      var formTop = $('#competition-query-form').offset().top;
-      $('html, body').animate({ scrollTop: formTop - 5 }, 300);
+    if($('#competitions-map').is(':visible')) {
+      // Switching between list/map/admin uses AJAX to load the map element,
+      // unfortunately it does not trigger our iframe resize trick...
+      // Google maps somehow did make this work, so if you're motivated,
+      // you could look at their source code to try to figure out how they detect and handle this situation.
+      wca._competitionsIndexMap.invalidateSize();
+      if ($(window).innerWidth() > 800) {
+        var formTop = $('#competition-query-form').offset().top;
+        $('html, body').animate({ scrollTop: formTop - 5 }, 300);
+      }
     }
   });
 

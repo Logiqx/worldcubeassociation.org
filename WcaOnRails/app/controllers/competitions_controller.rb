@@ -16,6 +16,7 @@ class CompetitionsController < ApplicationController
   before_action :authenticate_user!, except: [
     :index,
     :show,
+    :embedable_map,
     :show_podiums,
     :show_all_results,
     :show_results_by_person,
@@ -342,9 +343,11 @@ class CompetitionsController < ApplicationController
           body += "#{record_strs.join(", ")}.  \n" # Trailing spaces for markdown give us a <br>
         end
       end
-      comp.update!(results_posted_at: Time.now)
-      comp.competitor_users.each { |user| user.notify_of_results_posted(comp) }
-      comp.registrations.accepted.each { |registration| registration.user.notify_of_id_claim_possibility(comp) }
+      unless comp.results_posted?
+        comp.update!(results_posted_at: Time.now)
+        comp.competitor_users.each { |user| user.notify_of_results_posted(comp) }
+        comp.registrations.accepted.each { |registration| registration.user.notify_of_id_claim_possibility(comp) }
+      end
       create_post_and_redirect(title: title, body: body, author: current_user, tags: "results", world_readable: true)
     end
   end
@@ -498,6 +501,12 @@ class CompetitionsController < ApplicationController
 
   def show_results_by_person
     @competition = competition_from_params
+  end
+
+  def embedable_map
+    # NOTE: by default rails has a SAMEORIGIN X-Frame-Options
+    @query = params.require(:q)
+    render layout: false
   end
 
   def update
